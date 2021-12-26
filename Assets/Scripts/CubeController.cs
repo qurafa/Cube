@@ -6,17 +6,23 @@ public class CubeController : MonoBehaviour
 {
 
     [SerializeField] private GameObject[,,] _cubeMatrix = new GameObject[3, 3, 3];
-    [Range(0,1)][SerializeField] private float _speed;
+    [Range(0,5)][SerializeField] private float _speed;
 
     private bool _lockH = false;
     private bool _lockV = false;
-    private bool _initSet = false;
-    private float _initialX;
-    private float _initialY;
+    private float _yawMouse;
+    private float _pitchMouse;
+    private Rigidbody _rb;
+    private Rigidbody _pRb;
+    private GameObject _partSelect;
 
     // Start is called before the first frame update
     void Start()
     {
+        _rb = GetComponent<Rigidbody>();
+        _partSelect = new GameObject("PartSelect");
+        _pRb = _partSelect.AddComponent<Rigidbody>();
+        _pRb.useGravity = false;
         for (int i = 0; i < transform.childCount; i++)
         {
             _cubeMatrix[GetX(transform.GetChild(i).name), GetY(transform.GetChild(i).name), GetZ(transform.GetChild(i).name)] = transform.GetChild(i).gameObject;
@@ -27,19 +33,33 @@ public class CubeController : MonoBehaviour
     void Update()
     {
         RotateCube();
-        //PartSelect();
+        PartSelect();
+
+        if (Input.GetMouseButton(0) || Input.GetMouseButton(1))
+        {
+            _yawMouse = Input.GetAxis("Mouse X");
+            _pitchMouse = Input.GetAxis("Mouse Y");
+        }
+        else
+        {
+            _yawMouse = 0;
+            _pitchMouse = 0;
+        }
     }
 
     private void RotateCube()
     {
-        if (Input.GetMouseButton(0) && !Input.GetMouseButton(1))
+        if (Input.GetMouseButton(0))
         {
+            _rb.isKinematic = false;
             Cursor.lockState = CursorLockMode.Locked;
             Cursor.visible = false;
+            
+            if (_yawMouse != 0) _rb.AddTorque(-transform.parent.transform.up * _speed * _yawMouse);
 
-            float yawMouse = Input.GetAxis("Mouse X");
-            float pitchMouse = Input.GetAxis("Mouse Y");
+            if (_pitchMouse != 0) _rb.AddTorque(-transform.parent.transform.right * _speed * _pitchMouse);
 
+            /*
             Vector3 rotation = Vector3.zero;
 
             if (yawMouse > 0) rotation += -transform.parent.transform.up;
@@ -48,10 +68,9 @@ public class CubeController : MonoBehaviour
             if (pitchMouse > 0) rotation += -transform.parent.transform.right;
             else if (pitchMouse < 0) rotation += transform.parent.transform.right;
 
-            //Debug.Log("yawMouse: " + yawMouse + ", pitchMouse: " + pitchMouse);
-
             transform.Rotate(rotation, _speed);
-            
+            */
+
             /*
             float newX = pitchMouse * Mathf.Cos(Mathf.Deg2Rad * transform.eulerAngles.z) + yawMouse * Mathf.Sin(Mathf.Deg2Rad * transform.eulerAngles.y);
             float newY = yawMouse * Mathf.Cos(Mathf.Deg2Rad * transform.eulerAngles.z) + pitchMouse * Mathf.Sin(Mathf.Deg2Rad * transform.eulerAngles.x);
@@ -62,6 +81,7 @@ public class CubeController : MonoBehaviour
         }
         else
         {
+            _rb.isKinematic = true;
             Cursor.lockState = CursorLockMode.None;
             Cursor.visible = true;
         }
@@ -83,6 +103,11 @@ public class CubeController : MonoBehaviour
         }
         else
         {
+            if (_partSelect.transform.childCount != 0)
+                for(int i = 0; i < _partSelect.transform.childCount; i++)
+                    _partSelect.transform.GetChild(i).parent = transform.parent;
+
+            _pRb.isKinematic = true;
             _lockH = false;
             _lockV = false;
         }
@@ -90,11 +115,8 @@ public class CubeController : MonoBehaviour
 
     private void RotateParts(GameObject g)
     {
-        float yawMouse = Input.GetAxis("Mouse X");
-        float pitchMouse = Input.GetAxis("Mouse Y");
-
-        if (yawMouse < pitchMouse && !_lockH && !_lockV) _lockH = true;
-        if (yawMouse > pitchMouse && !_lockH && !_lockV) _lockV = true;
+        if (_yawMouse != 0 && !_lockH && !_lockV) _lockH = true;
+        if (_pitchMouse != 0 && !_lockH && !_lockV) _lockV = true;
 
         if (_lockV) RotatePartsH(g);
         //if (_lockH) RotatePartsV(g);
@@ -104,7 +126,13 @@ public class CubeController : MonoBehaviour
     {
         GameObject[] parts = GetPartsH(o);
 
-        foreach(GameObject g in parts) g.transform.Rotate(transform.up, _speed);
+        if(_partSelect.transform.childCount == 0)
+            foreach (GameObject g in parts) g.transform.parent = _partSelect.transform;
+
+        _pRb.isKinematic = false;
+        _pRb.AddTorque(-transform.up * _speed * _yawMouse);
+
+        //foreach (GameObject g in parts) g.transform.Rotate(transform.up, _speed);
     }
 
     private void RotatePartsV(GameObject o)
